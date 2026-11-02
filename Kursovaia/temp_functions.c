@@ -23,27 +23,39 @@ void add_record(temp_db_t *db, temp_record_t record) {
     db->records[db->count++] = record;
 }
 
-// Загрузка с проверкой формата и выводом номера ошибочной строки
-int load_csv(temp_db_t *db, const char *filename) {
+int load_csv(temp_db_t *db, const char *filename, int errors[13]) {
     FILE *f = fopen(filename, "r");
     if (!f) return 0;
     
     char line[256];
     int line_num = 0;
+    for(int i = 0; i <= 12; i++) errors[i] = 0;
     
     while (fgets(line, sizeof(line), f)) {
         line_num++;
         temp_record_t r;
-        // Ожидаем 6 чисел, разделенных ';'
+        // Проверяем, что считались ровно 6 чисел
         if (sscanf(line, "%hu;%hhu;%hhu;%hhu;%hhu;%hhd", &r.year, &r.month, &r.day, &r.hour, &r.minute, &r.temperature) == 6) {
             add_record(db, r);
         } else {
-            // Если формат не совпал - выводим ошибку и пропускаем строку
+            // Ошибка формата: выводим строку и пытаемся запомнить месяц для статистики
             printf("Error in line %d: Invalid CSV format. Skipping.\n", line_num);
+            unsigned short y; unsigned char m;
+            if (sscanf(line, "%hu;%hhu", &y, &m) == 2 && m >= 1 && m <= 12) {
+                errors[m]++;
+            }
         }
     }
     fclose(f);
     return 1;
+}
+
+int month_count(const temp_db_t *db, uint16_t year, uint8_t month) {
+    int cnt = 0;
+    for (size_t i = 0; i < db->count; i++) {
+        if (db->records[i].year == year && db->records[i].month == month) cnt++;
+    }
+    return cnt;
 }
 
 float month_avg_temp(const temp_db_t *db, uint16_t year, uint8_t month) {
